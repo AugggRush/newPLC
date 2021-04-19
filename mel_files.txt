@@ -1,0 +1,10 @@
+D:/VCwork-Py/waveglow-modified/waveglow/mel_spectrograms/LJ001-0015.wav.pt
+D:/VCwork-Py/waveglow-modified/waveglow/mel_spectrograms/LJ001-0051.wav.pt
+D:/VCwork-Py/waveglow-modified/waveglow/mel_spectrograms/LJ001-0063.wav.pt
+D:/VCwork-Py/waveglow-modified/waveglow/mel_spectrograms/LJ001-0072.wav.pt
+D:/VCwork-Py/waveglow-modified/waveglow/mel_spectrograms/LJ001-0079.wav.pt
+D:/VCwork-Py/waveglow-modified/waveglow/mel_spectrograms/LJ001-0094.wav.pt
+D:/VCwork-Py/waveglow-modified/waveglow/mel_spectrograms/LJ001-0096.wav.pt
+D:/VCwork-Py/waveglow-modified/waveglow/mel_spectrograms/LJ001-0102.wav.pt
+D:/VCwork-Py/waveglow-modified/waveglow/mel_spectrograms/LJ001-0153.wav.pt
+D:/VCwork-Py/waveglow-modified/waveglow/mel_spectrograms/LJ001-0173.wav.pt

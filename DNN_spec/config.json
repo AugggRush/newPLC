@@ -1,0 +1,26 @@
+{
+    "DNN_net_config": {
+     "n_layer": 4,
+     "n_in_channel": 880,
+     "n_out_channel" : 160
+    },
+    "DNN_train_config": {
+        "output_directory": "../DNN_checkpoints/",
+        "epochs": 100000,
+        "learning_rate": 1e-5,
+        "iters_per_checkpoint": 2000,
+        "batch_size": 12,
+        "seed": 1234,
+        "checkpoint_path": ""
+    },
+    "DNN_data_config": {
+        "training_files": "train_files.txt",
+        "num_frame": 12,
+        "sampling_rate": 16000,
+        "filter_length": 512,
+        "hop_length": 160,
+        "win_length": 320,
+        "mel_fmin": 0.0,
+        "mel_fmax": 8000.0
+    }
+}
