@@ -180,7 +180,7 @@ class WaveGlow(torch.nn.Module):
                  n_early_size, WN_config):
         super(WaveGlow, self).__init__()
 
-        self.upsample = torch.nn.ConvTranspose1d(n_mel_channels,
+        self.upsampling = torch.nn.ConvTranspose1d(n_mel_channels,
                                                  n_mel_channels,
                                                  512, stride=160)
         assert(n_group % 2 == 0)
@@ -212,7 +212,7 @@ class WaveGlow(torch.nn.Module):
         spect, audio = forward_input
 
         #  Upsample spectrogram to size of audio
-        spect = self.upsample(spect)
+        spect = self.upsampling(spect)
         assert(spect.size(2) >= audio.size(1))
         if spect.size(2) > audio.size(1):
             spect = spect[:, :, :audio.size(1)]
@@ -249,9 +249,9 @@ class WaveGlow(torch.nn.Module):
         return torch.cat(output_audio,1), log_s_list, log_det_W_list
 
     def infer(self, spect, sigma=1.0):
-        spect = self.upsample(spect)
+        spect = self.upsampling(spect)
         # trim conv artifacts. maybe pad spec to kernel multiple
-        time_cutoff = self.upsample.kernel_size[0]# - self.upsample.stride[0]
+        time_cutoff = self.upsampling.kernel_size[0]# - self.upsample.stride[0]
         spect = spect[:, :, :-time_cutoff]
 
         spect = spect.unfold(2, self.n_group, self.n_group).permute(0, 2, 1, 3)

@@ -28,7 +28,7 @@ import argparse
 import json
 import os
 import torch
-
+from tqdm import tqdm
 #=====START: ADDED FOR DISTRIBUTED======
 from distributed import init_distributed, apply_gradient_allreduce, reduce_tensor
 from torch.utils.data.distributed import DistributedSampler
@@ -37,7 +37,7 @@ from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data import DataLoader
 from glow import WaveGlow, WaveGlowLoss
 from mel2samp import Mel2Samp
-from mel2sampPlc import Mel2Samp_dislocation
+
 
 def load_checkpoint(checkpoint_path, model, optimizer):
     assert os.path.isfile(checkpoint_path)
@@ -62,7 +62,7 @@ def save_checkpoint(model, optimizer, learning_rate, iteration, filepath):
 
 def train(num_gpus, rank, group_name, output_directory, epochs, learning_rate,
           sigma, iters_per_checkpoint, batch_size, seed, fp16_run,
-          checkpoint_path, is_PLC, with_tensorboard):
+          checkpoint_path, with_tensorboard):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     #=====START: ADDED FOR DISTRIBUTED======
@@ -87,9 +87,19 @@ def train(num_gpus, rank, group_name, output_directory, epochs, learning_rate,
     # Load checkpoint if one exists
     iteration = 0
     if checkpoint_path != "":
-        if checkpoint_path == "waveglow_256channels_universal_v5.pt":
-            model = torch.load(checkpoint_path)['model']
-            model.cuda()
+        if checkpoint_path == "../waveglow_256channels_universal_v5.pt":
+            pretrained_model = torch.load(checkpoint_path)['model']
+            # model.cuda()
+            pretrained_dict = pretrained_model.state_dict()
+            
+            model_dict = model.state_dict()
+            # 将pretrained_dict里不属于model_dict的键剔除掉
+            pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
+            # 更新现有的model_dict
+            model_dict.update(pretrained_dict)
+            # 加载我们真正需要的state_dict
+            model.load_state_dict(model_dict)
+
         else:
             model, optimizer, iteration = load_checkpoint(checkpoint_path, model,
                                                       optimizer)
@@ -121,7 +131,7 @@ def train(num_gpus, rank, group_name, output_directory, epochs, learning_rate,
     # ================ MAIN TRAINNIG LOOP! ===================
     for epoch in range(epoch_offset, epochs):
         print("Epoch: {}".format(epoch))
-        for i, batch in enumerate(train_loader):
+        for i, batch in tqdm(enumerate(train_loader)):
             model.zero_grad()
 
             mel, audio = batch

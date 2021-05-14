@@ -7,8 +7,8 @@ from stft import STFT
 class Denoiser(torch.nn.Module):
     """ Removes model bias from audio produced with waveglow """
 
-    def __init__(self, waveglow, filter_length=1024, n_overlap=4,
-                 win_length=1024, mode='zeros'):
+    def __init__(self, waveglow, filter_length=512, n_overlap=2,
+                 win_length=320, mode='zeros'):
         super(Denoiser, self).__init__()
         self.stft = STFT(filter_length=filter_length,
                          hop_length=int(filter_length/n_overlap),
@@ -16,13 +16,13 @@ class Denoiser(torch.nn.Module):
         if mode == 'zeros':
             mel_input = torch.zeros(
                 (1, 80, 88),
-                dtype=waveglow.upsample.weight.dtype,
-                device=waveglow.upsample.weight.device)
+                dtype=waveglow.upsampling.weight.dtype,
+                device=waveglow.upsampling.weight.device)
         elif mode == 'normal':
             mel_input = torch.randn(
                 (1, 80, 88),
-                dtype=waveglow.upsample.weight.dtype,
-                device=waveglow.upsample.weight.device)
+                dtype=waveglow.upsampling.weight.dtype,
+                device=waveglow.upsampling.weight.device)
         else:
             raise Exception("Mode {} if not supported".format(mode))
 

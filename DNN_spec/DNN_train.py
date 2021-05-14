@@ -5,8 +5,9 @@ import torch
 import sys
 sys.path.append("./")
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 from DNN_spec.DNNnet import DNNnet, Dnn_net_Loss
-from DNN_spec.Mel2Load import Mel2Load
+from DNN_spec.linear2load import linear2load
 
 
 def load_checkpoint(checkpoint_path, model, optimizer):
@@ -52,8 +53,9 @@ def DNN_train(output_directory, epochs, learning_rate,\
         model.cuda()
         iteration += 1  # next iteration is iteration + 1
 
-    trainSet = Mel2Load(**DNN_data_config)
-    train_loader = DataLoader(trainSet, num_workers=1, shuffle=False,
+    trainSet = linear2load(**DNN_data_config)
+    trainSet.load_buffer()
+    train_loader = DataLoader(trainSet, num_workers=1, shuffle=True,
                             batch_size=batch_size,
                             pin_memory=False,
                             drop_last=True)
@@ -61,14 +63,12 @@ def DNN_train(output_directory, epochs, learning_rate,\
         os.makedirs(output_directory)
         os.chmod(output_directory, 0o775)
     print("output directory", output_directory)
-
     model.train(mode=True)
     epoch_offset = max(0, int(iteration / len(train_loader)))
     epoch_ave_loss = 0
     for epoch in range(epoch_offset, epochs):
-        print("Epoch: {}, the average epoch loss: {}".format(epoch, epoch_ave_loss))
         epoch_ave_loss = 0
-        for i, batch in enumerate(train_loader):
+        for i, batch in tqdm(enumerate(train_loader)):
             model.zero_grad()
 
             feed_mel, targ_mel = batch
@@ -84,19 +84,19 @@ def DNN_train(output_directory, epochs, learning_rate,\
 
             optimizer.step()
 
-            print("{}:\t{:.9f}".format(iteration, reduced_loss))
             epoch_ave_loss += reduced_loss
 
             if (iteration % iters_per_checkpoint == 0):
-                
-                checkpoint_path = "{}/DNN_net_{}".format(
-                    output_directory, iteration)
-                save_checkpoint(model, optimizer, learning_rate, iteration,
-                                checkpoint_path)
-
+                print("{}:\t{:.9f}".format(iteration, reduced_loss))
+            
             iteration += 1
 
+        checkpoint_path = "{}/DNN_net_{}".format(
+            output_directory, epoch)
+        save_checkpoint(model, optimizer, learning_rate, iteration,
+                        checkpoint_path)
         epoch_ave_loss = epoch_ave_loss / i
+        print("Epoch: {}, the average epoch loss: {}".format(epoch, epoch_ave_loss))
 
 
 if __name__ == "__main__":

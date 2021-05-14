@@ -97,6 +97,25 @@ class TacotronSTFT(torch.nn.Module):
         mel_output = self.spectral_normalize(mel_output)
         return mel_output
 
+    def linear_spectrogram(self, y):
+        """Computes linear-spectrograms from a batch of waves
+        PARAMS
+        ------
+        y: Variable(torch.FloatTensor) with shape (B, T) in range [-1, 1]
+
+        RETURNS
+        -------
+        mel_output: torch.FloatTensor of shape (B, n_mel_channels, T)
+        """
+        assert(torch.min(y.data) >= -1)
+        assert(torch.max(y.data) <= 1)
+
+        magnitudes, phases = self.stft_fn.transform(y)
+        magnitudes = magnitudes.data
+        linear_output = torch.pow(magnitudes, 2)
+        linear_output = self.spectral_normalize(linear_output)
+        return linear_output
+
 def files_to_list(filename):
     """
     Takes a text file of filenames and makes a list of filenames

@@ -69,13 +69,13 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-f', "--filelist_path", default="mel_files.txt")
-    parser.add_argument('-w', '--waveglow_path', default="checkpoints/waveglow_12000",
+    parser.add_argument('-w', '--waveglow_path', default="../waveglow_checkpoints/waveglow_10000",
                         help='Path to waveglow decoder checkpoint with model')
     parser.add_argument('-o', "--output_dir", default="infer_out/")
     parser.add_argument("-s", "--sigma", default=1.0, type=float)
-    parser.add_argument("--sampling_rate", default=22050, type=int)
+    parser.add_argument("--sampling_rate", default=16000, type=int)
     parser.add_argument("--is_fp16", action="store_true")
-    parser.add_argument("-d", "--denoiser_strength", default=0.1, type=float,
+    parser.add_argument("-d", "--denoiser_strength", default=0.0, type=float,
                         help='Removes model bias. Start with 0.1 and adjust')
 
     args = parser.parse_args()
