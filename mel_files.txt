@@ -1,5 +1,1 @@
-Mel2test/LJ001-0096.wav.pt
-Mel2test/LJ050-0275.wav.pt
-Mel2test/LJ050-0276.wav.pt
-Mel2test/LJ050-0277.wav.pt
-Mel2test/LJ050-0278.wav.pt
+mel_spectrograms/LJ001-0096.wav.pt

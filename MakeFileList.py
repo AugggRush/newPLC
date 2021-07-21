@@ -1,10 +1,24 @@
 import os
 import librosa
 import soundfile
-dataFilepath = "./Mel2test/"
-# tarFilepath = "F:/DATA/LJSpeech-1/LJSpeech-1.0-16k/"
-filenames = os.listdir(dataFilepath)
+# dataFilepath = "./Mel2test/"
+tarFilepath = "F:/DATA/LJSpeech-1/LJSpeech-1.0-16k/"
+filenames = os.listdir(tarFilepath)
+plFilepath = 'D:/VCwork-Py/waveglow-modified/pl_wave/'
+subfiles = os.listdir(plFilepath)
+with open("pl_files.txt", 'w+') as f:
+    for i in subfiles:
+        print(i)
+        tempfile = os.path.join(plFilepath, i)
+        # filenames = os.listdir(tempfile)
+        # for item in tempfile:
+        #     if item[-3:] != 'wav':
+        #         continue
+        #     else:
+        #         print(item)
+        #         tempname = os.path.join(tempfile, item)
 
+        f.write(tempfile+'\n')
 # for item in filenames:
 #     print(item)
 #     temp = os.path.join(dataFilepath, item)
@@ -19,9 +33,9 @@ filenames = os.listdir(dataFilepath)
 # with open("train_files.txt", 'w+') as f:
 #     for item in filenames[:-100]:
 #         f.write('../LJSpeech-1.0-16k/'+item+'\n')
-# with open("test_files.txt", 'w+') as f:
-#     for item in filenames[-4:]:
-#         f.write('../LJSpeech-1.0-16k/'+item+'\n')
-with open("mel_files.txt", 'w+') as f:
-    for item in filenames:
-        f.write('Mel2test/'+item+'\n')
+with open("test_files.txt", 'w+') as f:
+    for item in filenames[-100:]:
+        f.write('../LJSpeech-1.0-16k/'+item+'\n')
+# with open("mel_files.txt", 'w+') as f:
+#     for item in filenames:
+#         f.write('Mel2test/'+item+'\n')

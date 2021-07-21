@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 sys.path.append("./")
 
 from DNN_spec.DNNnet import DNNnet
-from DNN_spec.linear2load import linear2load
+from DNN_spec.spec2load import spec2load
 import mel2samp as ms
 
 def DNN_test(checkpoint_path, filename):
@@ -24,7 +24,7 @@ def DNN_test(checkpoint_path, filename):
 
     model.eval()
 
-    Data_gen = linear2load(**DNN_data_config)
+    Data_gen = spec2load(**DNN_data_config)
 
     audio, sr = ms.load_wav_to_torch(filename)
     # Take segment
@@ -36,24 +36,24 @@ def DNN_test(checkpoint_path, filename):
         audio = torch.nn.functional.pad(audio, (2240 - audio.size(0), 0), 'constant').data
 
 
-    linear = Data_gen.get_mel(audio)
-    feed_linear = linear[:,:-2]
-    targ_linear = linear[:,-2:]
-    feed_linear = feed_linear.unsqueeze(0)
-    gener_linear = model.forward(feed_linear)
+    spec = Data_gen.get_spec(audio)
+    feed_spec = spec[:,:-2]
+    targ_spec = spec[:,-2:]
+    feed_spec = feed_spec.unsqueeze(0)
+    gener_spec = model.forward(feed_spec)
     
     # gener_linear = gener_linear.squeeze().view(-1, 2).T
-    gener_linear = gener_linear.detach().numpy()
-    targ_linear = torch.cat((targ_linear[:,0], targ_linear[:,1]), 0)
-    targ_linear = targ_linear.numpy()
+    gener_spec = gener_spec.detach().numpy()
+    targ_spec = torch.cat((targ_spec[:,0], targ_spec[:,1]), 0)
+    targ_spec = targ_spec.numpy()
     # targ_mel_db = librosa.power_to_db(targ_mel[0], ref=np.max)
     # gener_mel_db = librosa.power_to_db(gener_mel[0], ref=np.max)
     plt.figure()
 
-    plt.plot(targ_linear)
+    plt.plot(targ_spec)
     # librosa.display.specshow(targ_mel, x_axis='time', y_axis='mel')
 
-    plt.plot(gener_linear[0], 'r')
+    plt.plot(gener_spec[0], 'r')
     # librosa.display.specshow(gener_mel, x_axis='time', y_axis='mel')
 
     plt.show()
@@ -74,6 +74,6 @@ if __name__ == '__main__':
     DNN_data_config = config["DNN_data_config"]
     global DNN_net_config
     DNN_net_config = config["DNN_net_config"]
-    ckp = "G:/程序/waveglow-modified/DNN_checkpoints/MEL/DNN_net_24"
-    tap = "F:/DATA/LJSpeech-1/LJSpeech-1.0-16k/LJ050-0168.wav"
+    ckp = "../DNN_checkpoints/MEL/DNN_net_28"
+    tap = "F:/DATA/LJSpeech-1/LJSpeech-1.0-16k/LJ001-0096.wav"
     DNN_test(ckp, tap)

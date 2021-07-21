@@ -191,10 +191,10 @@ class Mel2Samp(torch.utils.data.Dataset):
 if __name__ == "__main__":
     # Get defaults so it can work with no Sacred
     parser = argparse.ArgumentParser()
-    parser.add_argument('-f', "--filelist_path", required=True)
-    parser.add_argument('-c', '--config', type=str,
+    parser.add_argument('-f', "--filelist_path", default= 'temp.txt')
+    parser.add_argument('-c', '--config', type=str, default= 'config.json',
                         help='JSON file for configuration')
-    parser.add_argument('-o', '--output_dir', type=str,
+    parser.add_argument('-o', '--output_dir', type=str, default= 'mel_spectrograms/',
                         help='Output directory')
     args = parser.parse_args()
 

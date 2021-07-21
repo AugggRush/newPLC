@@ -10,7 +10,7 @@ from mel2samp import files_to_list, MAX_WAV_VALUE
 from denoiser import Denoiser
 import mel2samp as ms
 from DNN_spec.DNNnet import DNNnet
-from DNN_spec.linear2load import linear2load
+from DNN_spec.spec2load import spec2load
 from Packlossfunction import frame2wav, win_generate
 # This file is going to recover the received packet(one frame) lossed audio.
 # Once the losed packet(one frame) was detected, the nueral net work is going to generate 
@@ -58,6 +58,24 @@ def extra_prevAudio(pl_frames, pl_index, win_length, hop_length):
 
     return torch.from_numpy(feed_audio).float()
 
+def extra_truespec(true_frames, pl_index, win_length, hop_length):
+
+    if pl_index == 0:
+        feed_frames = torch.zeros((13, win_length))
+    else:
+        if pl_index >= 11:
+            feed_frames = true_frames[pl_index-11:pl_index+2]
+        else: 
+            pad_zeros = torch.zeros((11-pl_index, win_length))
+            feed_frames = torch.cat((pad_zeros, true_frames[:pl_index+2]), dim=0)
+ 
+    feed_audio = frame2wav(feed_frames.numpy(), hop_length)
+    true_audio = torch.from_numpy(feed_audio).float()
+    Data_gen = spec2load(**DNN_data_config)
+    spec = Data_gen.get_spec(true_audio)
+    true_spec = spec.unsqueeze(0)
+
+    return true_spec
 
 def DNN_stretch(feed_audio, DNN_path):
     assert os.path.isfile(DNN_path)
@@ -71,16 +89,16 @@ def DNN_stretch(feed_audio, DNN_path):
 
     model.eval()
 
-    Data_gen = linear2load(**DNN_data_config)
+    Data_gen = spec2load(**DNN_data_config)
 
-    mel = Data_gen.get_mel(feed_audio)
-    feed_mel = mel.unsqueeze(0)
-    gener_mel = model.forward(feed_mel)
+    spec = Data_gen.get_spec(feed_audio)
+    feed_spec = spec.unsqueeze(0)
+    gener_spec = model.forward(feed_spec)
 
-    out_mel = torch.stack([gener_mel[:, :mel.size(0)], \
-        gener_mel[:, mel.size(0):]], dim=-1)
+    out_mel = torch.stack([gener_spec[:, :spec.size(0)], \
+        gener_spec[:, spec.size(0):]], dim=-1)
 
-    com_mel = torch.cat((feed_mel, out_mel), dim=2)
+    com_mel = torch.cat((feed_spec, out_mel), dim=2)
 
     return com_mel
 
@@ -107,26 +125,6 @@ def inference_plc(mel, waveglow_path, sigma, sampling_rate, is_fp16,
 
     return audio
 
-# def WSOLA(audio_frag, glowaudio, hop_length, win_length):
-    
-#     likely_probe = audio_frag[-hop_length:]
-#     audio_patch = glowaudio[-2*hop_length+win_length:]
-#     max_cor = -ms.MAX_WAV_VALUE
-#     max_i = hop_length
-#     for i in range(2*hop_length):
-#         cor = torch.dot(likely_probe, audio_patch[i:i+hop_length])
-#         if cor >= max_cor:
-#             max_cor = cor
-#             max_i = i
-#         else:
-#             continue
-#     print("the most similar segment index is found at {}, has value {}".format(max_i, max_cor))
-#     window = get_window('hann', win_length, fftbins=False)
-#     audio_frag[-hop_length:] = audio_frag[-hop_length:]*window[-hop_length:] + audio_patch[max_i:max_i+hop_length]*window[:hop_length]
-#     stretch_audio = torch.cat((audio_frag, audio_patch[max_i+hop_length:max_i+win_length]), dim=-1)
-
-#     return stretch_audio
-
 def audio_mend(audio_file, win_length, hop_length, \
         DNN_path, waveglow_path, sigma, sampling_rate, is_fp16,
         denoiser_strength, comparation):
@@ -149,13 +147,21 @@ def audio_mend(audio_file, win_length, hop_length, \
         else:
             print("Number {} frame is loss, compensation start:".format(index))
             prev_audio = extra_prevAudio(pl_frames, index, win_length, hop_length)
-
+            #Mel comparation part
+            true_Mel = extra_truespec(comparation, index, win_length, hop_length)
             mel = DNN_stretch(prev_audio, DNN_path)
-
-            glowaudio = inference_plc(mel, waveglow_path, sigma, sampling_rate, is_fp16, denoiser_strength)
+            true_Mel2plot = true_Mel.squeeze(0).transpose(0, 1)
+            mel2plot = mel.squeeze(0).transpose(0, 1).detach()
+            plt.figure('mel compare '+str(index))
+            plt.plot(true_Mel2plot[-2:].flatten(), 'b')
+            plt.plot(mel2plot[-2:].flatten(), 'y')
             
+            ##############################################
+            glowaudio = inference_plc(mel, waveglow_path, sigma, sampling_rate, is_fp16, denoiser_strength)
+            #power_factor = power_adjust(prev_audio, glowaudio[:-(win_length)])
+
             likely_probe = prev_audio[-hop_length:]
-            audio_patch = glowaudio[-(2*hop_length+win_length):]
+            audio_patch = glowaudio[-(2*hop_length+win_length):]# * power_factor
             audio_patch = audio_patch.cpu()
             max_cor = -ms.MAX_WAV_VALUE
             max_i = hop_length
@@ -169,14 +175,17 @@ def audio_mend(audio_file, win_length, hop_length, \
             print("The most similar segment index is found at {}, has value {}".format(max_i, max_cor))
             candidate_frame = audio_patch[max_i:max_i+win_length]
             candidate_frame = candidate_frame * window / win_adjust
-
-            pl_frames[index] = candidate_frame * gain_factor
+            plt.figure('frame_compare'+str(index))
+            plt.plot(comparation[index])
+            plt.plot(candidate_frame, 'y')
+            plt.show()
+            pl_frames[index] = candidate_frame #* gain_factor
             print("Number {} frame`s compensation complete.".format(index))
             gain_factor = gain_factor - 0.2
     
     compensate_audio = frame2wav(pl_frames.numpy(), hop_length)
 
-    return compensate_audio
+    # return compensate_audio
 
 
 if __name__ == '__main__':
@@ -187,12 +196,12 @@ if __name__ == '__main__':
                         help='JSON file for configuration')
     parser.add_argument('-c2', '--config2', type=str, default='DNN_spec/config.json',
                         help='JSON file for configuration')
-    parser.add_argument('-a', "--audio_file", default="../pl_wave/LJ001-0096_30percent_pl.npy")
-    parser.add_argument('-dp', '--DNN_path', default="../DNN_checkpoints/MEL/DNN_net_24",
+    # parser.add_argument('-a', "--audio_file", default="../pl_wave/LJ050-0223/LJ050-0223_10percent_pl.npy")
+    parser.add_argument('-dp', '--DNN_path', default="../DNN_checkpoints/MEL/DNN_net_28",
                     help='Path to DNN checkpoint with model')
     parser.add_argument('-wp', '--waveglow_path', default="../waveglow_checkpoints/waveglow_10000",
                         help='Path to waveglow decoder checkpoint with model')
-    parser.add_argument('-o', "--output_dir", default="../pl_wave/")
+    # parser.add_argument('-o', "--output_dir", default="../pl_wave/")
     parser.add_argument("-s", "--sigma", default=0.8, type=float)
     parser.add_argument("--sampling_rate", default=16000, type=int)
     parser.add_argument("--is_fp16", action="store_true")
@@ -201,6 +210,11 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    filename = 'pl_files.txt'
+    with open(filename, encoding='utf-8') as f:
+        files = f.readlines()
+        files = [f.rstrip() for f in files]
+    num_files = len(files)
     # Parse configs.  Globals nicer in this case
     with open(args.config1) as f1:
         data = f1.read()
@@ -216,22 +230,38 @@ if __name__ == '__main__':
     DNN_data_config = config2["DNN_data_config"]
     global DNN_net_config
     DNN_net_config = config2["DNN_net_config"]
+    DNN_check_files = os.listdir('../DNN_checkpoints/MEL/')
 
-    pl_audio, _ = librosa.load('../pl_wave/LJ001-0096_30percent_pl.wav', sr=16000, mono=True)
-    pl_audio = pl_audio * ms.MAX_WAV_VALUE
-    origin_audio, _ = librosa.load('../pl_wave/LJ001-0096_0percent_pl.wav', sr=16000, mono=True)
-    origin_audio = origin_audio * ms.MAX_WAV_VALUE
-    origin_frames = load_frames_to_torch('../pl_wave/LJ001-0096_0percent_pl.wav')
-    plc_audio = audio_mend(args.audio_file, DNN_data_config['win_length'], DNN_data_config['hop_length'], \
+
+    audio_files = []
+    for whole_files in os.listdir(files[1]):
+        if whole_files[-3:] == "npy":
+            audio_files.append(whole_files)
+
+    # for check_item in DNN_check_files:
+    # DNN_path = os.path.join('../DNN_checkpoints/MEL/', check_item)
+    savepath = os.path.join(files[1], 'DNN_28_wg_10000')
+    if not os.path.exists(savepath):
+        os.mkdir(savepath)
+    # for temp_item in audio_files[:20]:
+    #     file_item = os.path.join(files[1], temp_item)
+        
+    # pl_audio, _ = librosa.load('D:/VCwork-Py/waveglow-modified/LJSpeech-1.0-16k/LJ050-0223.wav', sr=16000, mono=True)
+    # pl_audio = pl_audio * ms.MAX_WAV_VALUE
+    # origin_audio, _ = librosa.load('../pl_wave/LJ050-0223/LJ050-0223_0percent_pl.wav', sr=16000, mono=True)
+    # origin_audio = origin_audio * ms.MAX_WAV_VALUE
+    file_item = '../pl_wave/plRate_30/LJ050-0265_30percent_pl.npy'
+    origin_frames = load_frames_to_torch('../pl_wave/plRate_0/LJ050-0265_0percent_pl.npy')
+    audio_mend(file_item, DNN_data_config['win_length'], DNN_data_config['hop_length'], \
         args.DNN_path, args.waveglow_path, args.sigma, args.sampling_rate, args.is_fp16, args.denoiser_strength, origin_frames)
 
 
 
-    plt.figure('audio_compare')
-    plt.plot(origin_audio, 'b')
-    plt.plot(pl_audio, 'y')
-    plt.plot(plc_audio, 'r')
-    plt.show()
-    savepath = args.audio_file[:-6] + 'compensate_adjust.wav'
-    soundfile.write(savepath, plc_audio/32768.0, args.sampling_rate)
-    print('Updated wav file at {}'.format(savepath))
+        # plt.figure('audio_compare')
+        # plt.plot(origin_audio, 'b')
+        # plt.plot(pl_audio, 'y')
+        # plt.plot(plc_audio, 'r')
+        # plt.show()
+        # result_path = os.path.join(savepath, temp_item[:-4] + 'DNN_28_wg_10000.wav')
+        # soundfile.write(result_path, plc_audio/32768.0, args.sampling_rate)
+        # print('Updated wav file at {}'.format(savepath))

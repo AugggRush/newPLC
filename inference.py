@@ -59,7 +59,7 @@ def main(mel_files, waveglow_path, sigma, output_dir, sampling_rate, is_fp16,
         audio = audio.cpu().numpy()
         audio = audio.astype('int16')
         audio_path = os.path.join(
-            output_dir, "{}_synthesis.wav".format(file_name))
+            output_dir, "{}_synthesis14000.wav".format(file_name))
         write(audio_path, sampling_rate, audio)
         print(audio_path)
 
@@ -69,10 +69,10 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-f', "--filelist_path", default="mel_files.txt")
-    parser.add_argument('-w', '--waveglow_path', default="../waveglow_checkpoints/waveglow_10000",
+    parser.add_argument('-w', '--waveglow_path', default="../waveglow_checkpoints/waveglow_14000",
                         help='Path to waveglow decoder checkpoint with model')
     parser.add_argument('-o', "--output_dir", default="infer_out/")
-    parser.add_argument("-s", "--sigma", default=1.0, type=float)
+    parser.add_argument("-s", "--sigma", default=0.8, type=float)
     parser.add_argument("--sampling_rate", default=16000, type=int)
     parser.add_argument("--is_fp16", action="store_true")
     parser.add_argument("-d", "--denoiser_strength", default=0.0, type=float,

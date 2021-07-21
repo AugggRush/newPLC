@@ -9,7 +9,7 @@ from scipy.io.wavfile import read
 from tqdm import tqdm
 import mel2samp as ms 
 
-class linear2load(torch.utils.data.Dataset):
+class spec2load(torch.utils.data.Dataset):
     """
     This is the main class that calculates the spectrogram and returns the
     long spectrogram, short spectrogram pair.
@@ -46,13 +46,13 @@ class linear2load(torch.utils.data.Dataset):
                 self.all_audio = torch.cat((self.all_audio, audio), 0)
         print("All audio has been loaded, totally length: {}".format(self.all_length))
     
-    def get_mel(self, audio_data):
+    def get_spec(self, audio_data):
         audio_norm = audio_data / ms.MAX_WAV_VALUE
         audio_norm = audio_norm.unsqueeze(0)
         audio_norm = torch.autograd.Variable(audio_norm, requires_grad=False)
-        mel_spec = self.stft.mel_spectrogram(audio_norm)
-        mel_spec = torch.squeeze(mel_spec, 0)
-        return mel_spec
+        spec = self.stft.mel_spectrogram(audio_norm)
+        spec = torch.squeeze(spec, 0)
+        return spec
     
     def __getitem__(self, index):
 
@@ -61,11 +61,11 @@ class linear2load(torch.utils.data.Dataset):
 
         audio_segment = self.all_audio[start_index:start_index+self.segment]
 
-        linear = self.get_mel(audio_segment)
-        feed_mel = linear[:,:-2]
-        targ_mel = linear[:,-2:]
+        spec = self.get_spec(audio_segment)
+        feed_spec = spec[:,:-2]
+        targ_spec = spec[:,-2:]
         
-        return (feed_mel, targ_mel)
+        return (feed_spec, targ_spec)
 
     def __len__(self):
 

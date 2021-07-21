@@ -7,61 +7,72 @@ from scipy.io.wavfile import read
 import matplotlib.pyplot as plt
 
 
-def packlossf(PackLoss, theo_pack_loss_maxlen, speech):#, speech
+def packlossf(PackLoss, speech_frames):#, speech
 
-	theo_pack_loss_rate = PackLoss /100 
+	desire_pack_loss_rate = PackLoss /100 
 	
-	total_packs = len(speech)
-	if theo_pack_loss_maxlen == 0:
-		q = 1 - theo_pack_loss_rate
-	else:
-		q = 1 / theo_pack_loss_maxlen
+	PG = 0
+	PB = 0.5
+	Gamma = 0.5
+    # P =(1- gamma )( 1 - (PB-FER)/(PB-PG)))
+	p = (1 - Gamma)*(1-( PB - desire_pack_loss_rate)/(PB - PG ))
+    # % Q =(1- gamma ) (PB-FER)/(PB-PG))
+	q = (1 - Gamma)*   ( PB - desire_pack_loss_rate)/(PB - PG )
+	
+	try:
+		if(p > 1-q):
+			raise ValueError("p > 1-q, 不符合Gilbert概率模型")
+	except ValueError as e:
+		print("引发异常：",repr(e))
 
-	p = (theo_pack_loss_rate*q)/(1 - theo_pack_loss_rate)
+	num_packets = speech_frames.shape[0]
+
+    
 
 	check = 100
-	while check >= 5 :
-		good = 1
+	while check >= 10 :
+		channel_good = 1
 		packets = []
 		pack_num = 1
-		while pack_num <= total_packs:
-			if good == 1:
-				packets.append(good) 
-				good = int (random.random() > p  ) #判断是否大于p，如果大于p，则返回1，否则返回0，相当于突发丢包得概率是p
-			elif good == 0:
-				packets.append(good) 
-				good = int (random.random() > (1- q)) #判断是否大于1-q，如果大于1-q，则返回1，否则返回0，相当于连续丢包得概率是1-q
+		while pack_num <= num_packets:
+			if channel_good == 1:
+				packet_good = channel_good
+				packets.append(packet_good) 
+				#判断是否大于p，如果大于p，则信道状态返回1，否则返回0，相当于信道变坏概率是p
+				channel_good = int (random.random() > p) 
+			elif channel_good == 0:
+				#判断是否大于PB，如果大于PB，则返回1 表示不丢，否则返回0，相当于信道坏的状况下丢包概率是PB
+				packet_good = int (random.random() > PB)
+				packets.append(packet_good) 
+				#判断是否大于1-q，如果大于1-q，则返回1，否则返回0，相当于信道连续变坏的概率是1-q
+				channel_good = int (random.random() > (1- q)) 
 			else:
 				print('error\n')
 				break
 			pack_num = pack_num + 1
-		# fid = open('Loss_Pattern_py.txt','w')
-		# # print(packets)
-		# fid.writelines(str(packets))
-		# fid.close()
-		
+
 		received_packs = np.sum(packets)
-		act_pack_loss_rate = 1 - received_packs/total_packs
-		check = abs(theo_pack_loss_rate - act_pack_loss_rate) / theo_pack_loss_rate * 100
-		print(check)
+		act_pack_loss_rate = 1 - received_packs/num_packets
+		check = abs(desire_pack_loss_rate - act_pack_loss_rate) / desire_pack_loss_rate * 100
+		# print(check)
 					
 
-	# print(theo_pack_loss_rate)
-	act_pack_loss_rate = 1 - received_packs/total_packs
-	# print(act_pack_loss_rate)
-	speech_PL = np.array(speech)
+	print("desire_pack_loss_rate: {}".format(desire_pack_loss_rate))
+	theo_pack_loss_rate = (q/(1 - Gamma))*PG + (p/(1 - Gamma))*PB
+	act_pack_loss_rate = 1 - received_packs/num_packets
+	print("theo_pack_loss_rate: {}".format(theo_pack_loss_rate))
+	print("act_pack_loss_rate: {}".format(act_pack_loss_rate))
+	speech_frames_PL = np.array(speech_frames)
 
-	for iframe in range(len(speech_PL)):
+	for iframe in range(len(speech_frames_PL)):
 		if packets[iframe] == 0:
-			speech_PL[iframe,:] = 0
+			speech_frames_PL[iframe,:] = 0
 
-
-
-	return packets, theo_pack_loss_rate, speech_PL
+	return packets, desire_pack_loss_rate, speech_frames_PL
 
 def win_generate(winLen):
 
-	bins = np.arange(0.5, winLen, dtype=np.float)
+	bins = np.arange(0.5, winLen, dtype=float)
 	win = np.sin(bins / winLen * np.pi)
 	return win
 
@@ -95,7 +106,7 @@ def frame2wav(frames, hoplen, wavlen = -1):
 	for i in range(raw):
 		win_adjust[i*hoplen:i*hoplen+col] = win_adjust[i*hoplen:i*hoplen+col] + (win * win)
 	win_adjust = np.sqrt(win_adjust / col)
-	placeholder = np.zeros(int((raw - 1) * hoplen + col), dtype = np.float)
+	placeholder = np.zeros(int((raw - 1) * hoplen + col), dtype = float)
 	for iframe in range(raw):
 		placeholder[iframe*hoplen:iframe*hoplen+col] = placeholder[iframe*hoplen:iframe*hoplen+col] + \
 		                                               frames[iframe] * win / win_adjust[iframe*hoplen:iframe*hoplen+col]
@@ -113,13 +124,12 @@ def activatePL(filename,
 			   framelen,
 			   hoplen,
                PackLoss, 
-			   theo_pack_loss_maxlen, 
 			   savepath):
 
 	sampling_rate, audio = read(filename)
 	frames = wav2frame(audio, framelen, hoplen)
 
-	pl_label, plRate, plFrame = packlossf(PackLoss, theo_pack_loss_maxlen, frames)
+	pl_label, plRate, plFrame = packlossf(PackLoss, frames)
 	
 	plAudio = frame2wav(plFrame, hoplen, len(audio))
 
@@ -134,81 +144,49 @@ def activatePL(filename,
 	# fid.close()
 	np.save(saveAudio[:-4], plFrame)
 	soundfile.write(saveAudio, plAudio/32768.0, sample_rate)
-	print('Updated wav file at {}'.format(filename))
+	print('Updated wav file of {}'.format(filename))
 
 
 	return saveAudio, saveLabel
 
 
 
-# def pl_detection(filename,
-#                 savename,
-#                 sample_rate,
-#                 frame_dur = 0.02,   # frame duration 20ms, same as one packet length
-#                 hop_dur = 0.01):
-#     '''Detectes first one lossed packet and send to recover'''
-#     '''Return boolean isLoss to determin wither packets loss in the file and append wave'''
-
-#     frame_len = int(frame_dur * sample_rate)
-#     hop_len = int(hop_dur * sample_rate)
-#     audio, _ = librosa.load(filename, sr=sample_rate, mono=True)
-#     originLen = len(audio)
-#     originwave = audio
-#     num_frames = 1 + int(np.ceil(float(np.abs(len(originwave) - frame_len)) / hop_len))
-#     pl_labels = np.loadtxt(filename[:-4]+'.txt', dtype=int)
-
-#     print(pl_labels)
-#     if num_frames != len(pl_labels):
-#         raise ValueError('packets loss label does not match the audios    '
-#                         'the frame number of this audio wave is {}    '.format(num_frames),
-#                         'but the number of labels is {}     '.format(len(pl_labels)),
-#                         'Please check it')
-
-#     audio = np.pad(audio, [0, frame_len - hop_len],
-#                 'constant')
-#     seed_Len = 0
-#     for index in range(num_frames):
-#         if pl_labels[index] == 0:
-#             print('packet loss encountered at frame {}'.format(index))
-#             isloss = 1
-#             pl_labels[index] = 1
-#             break
-#         else:
-#             print('There is no packet loss encountered at frame{}'.format(index))
-#             isloss = 0
-#     seed_Len = index * hop_len
-
-#     if isloss:
-#         wavform = originwave[:seed_Len]
-#     else:
-#         wavform = originwave[:originLen]
-
-#     write_wav(wavform, sample_rate, savename)
-
-#     np.savetxt(filename[:-4]+'.txt', np.array(pl_labels), fmt='%d')
-
-#     return isloss, originwave[:seed_Len], originwave[seed_Len+frame_len:originLen]
-
 if __name__ == '__main__':
-    
-	audioname, labelname = activatePL('D:/VCwork-Py/waveglow-modified/LJSpeech-1.0-16k/LJ001-0096.wav',
-	                                  16000,
-									  320, 160, 10, 2, 'D:/VCwork-Py/waveglow-modified/pl_wave/')
-	plaudio, _ = librosa.load(audioname, sr=16000, mono=True)
-	pl_label = np.loadtxt(labelname, dtype=int)
-	plframe = wav2frame(plaudio, 320, 160)
-	print(plframe.shape)
-	print(pl_label.shape)
-	# winValue = win_generate(1024)
+
+	filename = 'test_files.txt'
+	with open(filename, encoding='utf-8') as f:
+		files = f.readlines()
+		files = [f.rstrip() for f in files]
+	random.seed(222)
+	random.shuffle(files)
+	num_files = len(files)
+	for rate in [0, 30]:
+		if not os.path.exists('../libri-temp/plRate_'+str(rate)):
+			os.makedirs('../libri-temp/plRate_'+str(rate))
+			savePath = '../libri-temp/plRate_'+str(rate)
+		else:
+			savePath = '../libri-temp/plRate_'+str(rate)
+		for i in range(1):
+			# filename = files[i]
+			filename = 'F:/DATA/LibriSpeex/Train-100/8468-294887-0001.wav'
+			audioname, labelname = activatePL(filename,
+											16000,
+											320, 160, rate, savePath)
+			# plaudio, _ = librosa.load(audioname, sr=16000, mono=True)
+			# pl_label = np.loadtxt(labelname, dtype=int)
+			# plframe = wav2frame(plaudio, 320, 160)
+			# print(plframe.shape)
+			# print(pl_label.shape)
+			# # winValue = win_generate(1024)
 
 
 
-	audio, _ = librosa.load('D:/VCwork-Py/waveglow-modified/LJSpeech-1.0-16k/LJ001-0096.wav', sr=16000, mono=True)
-	# rec = frame2wav(wav2frame(audio, 512, 128), 128, len(audio))
-	plt.subplot(211)
-	plt.plot(audio)
-	plt.subplot(212)
-	plt.plot(plaudio-audio)
-	plt.show()
+			# audio, _ = librosa.load('D:/VCwork-Py/waveglow-modified/LJSpeech-1.0-16k/LJ050-0223.wav', sr=16000, mono=True)
+			# # rec = frame2wav(wav2frame(audio, 512, 128), 128, len(audio))
+			# plt.subplot(211)
+			# plt.plot(audio)
+			# plt.subplot(212)
+			# plt.plot(plaudio-audio)
+			# plt.show()
 
 

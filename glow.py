@@ -251,7 +251,7 @@ class WaveGlow(torch.nn.Module):
     def infer(self, spect, sigma=1.0):
         spect = self.upsampling(spect)
         # trim conv artifacts. maybe pad spec to kernel multiple
-        time_cutoff = self.upsampling.kernel_size[0]# - self.upsample.stride[0]
+        time_cutoff = self.upsampling.kernel_size[0] - 2 * self.upsampling.stride[0]
         spect = spect[:, :, :-time_cutoff]
 
         spect = spect.unfold(2, self.n_group, self.n_group).permute(0, 2, 1, 3)

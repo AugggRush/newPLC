@@ -1,0 +1,2 @@
+D:/VCwork-Py/waveglow-modified/libri-temp/plRate_0
+D:/VCwork-Py/waveglow-modified/libri-temp/plRate_30
